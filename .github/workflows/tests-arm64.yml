@@ -1,0 +1,43 @@
+name: tests-arm64
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  verify-arm64-avrea:
+    runs-on: avrea-macos-latest
+    env:
+      RUNTIME_VERSION: 10.0.14
+    timeout-minutes: 20
+    outputs:
+      passed: ${{ steps.verify.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - id: verify
+        continue-on-error: true
+        uses: ./.github/actions/verify
+        with:
+          rid: osx-arm64
+          runtime_version: ${{ env.RUNTIME_VERSION }}
+
+  verify-arm64-gh:
+    needs: verify-arm64-avrea
+    if: always() && (needs.verify-arm64-avrea.result != 'success' || needs.verify-arm64-avrea.outputs.passed != 'true')
+    runs-on: macos-15
+    env:
+      RUNTIME_VERSION: 10.0.14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - id: verify
+        continue-on-error: true
+        uses: ./.github/actions/verify
+        with:
+          rid: osx-arm64
+          runtime_version: ${{ env.RUNTIME_VERSION }}

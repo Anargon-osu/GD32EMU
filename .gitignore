@@ -1,0 +1,11 @@
+# build output
+bin/
+obj/
+.publish/
+/gd32emu
+/gd32emu.exe
+tests/work/
+tests/bin/
+tests/obj/
+tests/__pycache__/
+packages/

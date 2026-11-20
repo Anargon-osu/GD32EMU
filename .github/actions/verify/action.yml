@@ -1,0 +1,55 @@
+name: Build, verify, and package
+description: Build, verify, and package gd32emu
+inputs:
+  rid:
+    required: true
+    description: ''
+  runtime_version:
+    required: true
+    description: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: '3.12'
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        dotnet-version: '10.0.x'
+    - name: Build Windows and run emulator regressions
+      if: runner.os == 'Windows'
+      shell: cmd
+      run: build.cmd
+    - name: Verify compiler errors fail the Windows build
+      if: runner.os == 'Windows'
+      shell: bash
+      run: python -I tests/test-build-failure.py
+    - name: Publish native executable and run emulator regressions
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        RUNTIME_VERSION: ${{ inputs.runtime_version }}
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+        DOTNET_NOLOGO: "true"
+        XDG_RUNTIME_DIR: /tmp
+      run: |
+        dotnet publish gd32emu.csproj -c Release -r '${{ inputs.rid }}' -p:RuntimeFrameworkVersion="$RUNTIME_VERSION" -o .publish
+        cp .publish/gd32emu .
+        dotnet run --project tests/EmulatorTests.csproj -c Release
+    - name: Package and smoke-test the extracted executable
+      shell: bash
+      env:
+        RID: ${{ inputs.rid }}
+        RUNTIME_VERSION: ${{ inputs.runtime_version }}
+      run: |
+        exe=./gd32emu
+        if [ "$RID" = win-x64 ]; then exe="$exe.exe"; fi
+        runtime_args=()
+        if [ "$RID" != win-x64 ]; then runtime_args=(--runtime-version "$RUNTIME_VERSION"); fi
+        python -I tests/package.py "$exe" "$RID" "${runtime_args[@]}"
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: gd32emu-${{ inputs.rid }}
+        path: packages/*
+        if-no-files-found: error
